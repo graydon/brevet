@@ -2,7 +2,7 @@
 name = "brevet"
 version = "0.1.0"
 edition = "2021"
-descriptioin = "Evaluator for Ei calculus with dependent merges and first class environments"
+description = "Evaluator for Ei calculus with dependent merges and first class environments"
 readme = "README.md"
 repository = "https://github.com/graydon/brevet"
 license = "MIT OR Apache-2.0"
