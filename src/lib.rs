@@ -1,16 +1,23 @@
 use arbitrary::Arbitrary;
+use serde::{Serialize,Deserialize};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize)]
 pub struct Label(Arc<String>);
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize)]
 pub enum Type {
     Top,
     Int,
     Arr(Arc<Type>, Arc<Type>),
     And(Arc<Type>, Arc<Type>),
     Rcd(Label, Arc<Type>),
+}
+
+impl Default for Type {
+    fn default() -> Self {
+        Type::Top
+    }
 }
 
 impl Type {
@@ -23,13 +30,13 @@ impl Type {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize)]
 pub enum AbstrMode {
     AbstrLabHide,
     AbstrGeneral,
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize)]
 pub enum Expr {
     Top,
     Int(i64),
@@ -41,6 +48,12 @@ pub enum Expr {
     Annot(Arc<Expr>, Arc<Type>),
     Label(Label, Arc<Expr>),
     Fetch(Arc<Expr>, Label),
+}
+
+impl Default for Expr {
+    fn default() -> Self {
+        Expr::Top
+    }
 }
 
 impl Expr {
@@ -99,7 +112,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Arbitrary)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize)]
 pub enum Error {
     General(String),
     NonValEnv,
