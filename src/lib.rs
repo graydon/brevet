@@ -1,16 +1,16 @@
 use arbitrary::Arbitrary;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Arbitrary)]
-pub struct Label(Rc<String>);
+pub struct Label(Arc<String>);
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Arbitrary)]
 pub enum Type {
     Top,
     Int,
-    Arr(Rc<Type>, Rc<Type>),
-    And(Rc<Type>, Rc<Type>),
-    Rcd(Label, Rc<Type>),
+    Arr(Arc<Type>, Arc<Type>),
+    And(Arc<Type>, Arc<Type>),
+    Rcd(Label, Arc<Type>),
 }
 
 impl Type {
@@ -34,18 +34,18 @@ pub enum Expr {
     Top,
     Int(i64),
     Query,
-    Abstr(AbstrMode, Rc<Expr>),
-    Close { env: Rc<Expr>, expr: Rc<Expr> },
-    Apply(Rc<Expr>, Rc<Expr>),
-    Merge(Rc<Expr>, Rc<Expr>),
-    Annot(Rc<Expr>, Rc<Type>),
-    Label(Label, Rc<Expr>),
-    Fetch(Rc<Expr>, Label),
+    Abstr(AbstrMode, Arc<Expr>),
+    Close { env: Arc<Expr>, expr: Arc<Expr> },
+    Apply(Arc<Expr>, Arc<Expr>),
+    Merge(Arc<Expr>, Arc<Expr>),
+    Annot(Arc<Expr>, Arc<Type>),
+    Label(Label, Arc<Expr>),
+    Fetch(Arc<Expr>, Label),
 }
 
 impl Expr {
     pub fn merge(&self, other: &Expr) -> Expr {
-        Expr::Merge(Rc::new(self.clone()), Rc::new(other.clone()))
+        Expr::Merge(Arc::new(self.clone()), Arc::new(other.clone()))
     }
     pub fn is_abstr(&self) -> bool {
         if let Expr::Abstr(_, _) = self {
@@ -189,14 +189,14 @@ pub fn valgen(ty: &Type) -> Result<Expr, Error> {
         Type::Top => Ok(Expr::Top),
         Type::Int => Err(Error::StuckCast),
         Type::Arr(_, b) => {
-            let expr = Rc::new(valgen(b)?);
-            let abstr_expr = Rc::new(Expr::Abstr(AbstrMode::AbstrGeneral, expr));
-            let env = Rc::new(Expr::Top);
-            let expr = Rc::new(Expr::Annot(abstr_expr, Rc::new(ty.clone())));
+            let expr = Arc::new(valgen(b)?);
+            let abstr_expr = Arc::new(Expr::Abstr(AbstrMode::AbstrGeneral, expr));
+            let env = Arc::new(Expr::Top);
+            let expr = Arc::new(Expr::Annot(abstr_expr, Arc::new(ty.clone())));
             Ok(Expr::Close { env, expr })
         }
-        Type::And(a, b) => Ok(Expr::Merge(Rc::new(valgen(a)?), Rc::new(valgen(b)?))),
-        Type::Rcd(lab, ty) => Ok(Expr::Label(lab.clone(), Rc::new(valgen(ty)?))),
+        Type::And(a, b) => Ok(Expr::Merge(Arc::new(valgen(a)?), Arc::new(valgen(b)?))),
+        Type::Rcd(lab, ty) => Ok(Expr::Label(lab.clone(), Arc::new(valgen(ty)?))),
     }
 }
 
@@ -219,8 +219,8 @@ pub fn cast(val: &Expr, ty: &Type) -> Result<Expr, Error> {
             } else {
                 // CASTING-ARROW
                 // TODO: modes
-                let new_ty = Rc::new(Type::Arr(a.clone(), d.clone()));
-                let new_annot_expr = Rc::new(Expr::Annot(e.clone(), new_ty));
+                let new_ty = Arc::new(Type::Arr(a.clone(), d.clone()));
+                let new_annot_expr = Arc::new(Expr::Annot(e.clone(), new_ty));
                 Ok(Expr::Close {
                     env: env.clone(),
                     expr: new_annot_expr,
@@ -238,10 +238,10 @@ pub fn cast(val: &Expr, ty: &Type) -> Result<Expr, Error> {
             }
         }
         // CASTING-AND
-        (_, Type::And(a, b)) => Ok(Expr::Merge(Rc::new(cast(val, a)?), Rc::new(cast(val, b)?))),
+        (_, Type::And(a, b)) => Ok(Expr::Merge(Arc::new(cast(val, a)?), Arc::new(cast(val, b)?))),
         // CASTING-RCD
         (Expr::Label(elab, e), Type::Rcd(tlab, t)) if elab == tlab => {
-            Ok(Expr::Label(elab.clone(), Rc::new(cast(e, t)?)))
+            Ok(Expr::Label(elab.clone(), Arc::new(cast(e, t)?)))
         }
         _ => Err(Error::StuckCast),
     }
@@ -270,8 +270,8 @@ pub fn step(env: &Expr, expr: &Expr) -> Result<Expr, Error> {
 
         // STEP-CLOSURE
         e if e.is_arr_annot_abstr() => Ok(Expr::Close {
-            env: Rc::new(env.clone()),
-            expr: Rc::new(e.clone()),
+            env: Arc::new(env.clone()),
+            expr: Arc::new(e.clone()),
         }),
 
         // STEP-BOX
@@ -308,8 +308,8 @@ pub fn step(env: &Expr, expr: &Expr) -> Result<Expr, Error> {
             let new_env = env1.merge(arg);
             let new_annot = Expr::Annot(body.clone(), b.clone());
             Ok(Expr::Close {
-                env: Rc::new(new_env),
-                expr: Rc::new(new_annot),
+                env: Arc::new(new_env),
+                expr: Arc::new(new_annot),
             })
         }
 
@@ -322,16 +322,16 @@ pub fn step(env: &Expr, expr: &Expr) -> Result<Expr, Error> {
         }
 
         // STEP-EVAL
-        Expr::Annot(e, t) => Ok(Expr::Annot(Rc::new(step(env, e)?), t.clone())),
-        Expr::Merge(a, b) => Ok(Expr::Merge(Rc::new(step(env, a)?), b.clone())),
-        Expr::Label(lab, e) => Ok(Expr::Label(lab.clone(), Rc::new(step(env, e)?))),
-        Expr::Fetch(e, lab) => Ok(Expr::Fetch(Rc::new(step(env, e)?), lab.clone())),
+        Expr::Annot(e, t) => Ok(Expr::Annot(Arc::new(step(env, e)?), t.clone())),
+        Expr::Merge(a, b) => Ok(Expr::Merge(Arc::new(step(env, a)?), b.clone())),
+        Expr::Label(lab, e) => Ok(Expr::Label(lab.clone(), Arc::new(step(env, e)?))),
+        Expr::Fetch(e, lab) => Ok(Expr::Fetch(Arc::new(step(env, e)?), lab.clone())),
         Expr::Apply(clo, arg) if !clo.is_val() => {
-            Ok(Expr::Apply(Rc::new(step(env, clo)?), arg.clone()))
+            Ok(Expr::Apply(Arc::new(step(env, clo)?), arg.clone()))
         }
-        Expr::Apply(clo, arg) => Ok(Expr::Apply(clo.clone(), Rc::new(step(env, arg)?))),
+        Expr::Apply(clo, arg) => Ok(Expr::Apply(clo.clone(), Arc::new(step(env, arg)?))),
         Expr::Close { env: env1, expr } => Ok(Expr::Close {
-            env: Rc::new(step(env, env1)?),
+            env: Arc::new(step(env, env1)?),
             expr: expr.clone(),
         }),
 
