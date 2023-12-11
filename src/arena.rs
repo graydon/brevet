@@ -34,6 +34,15 @@ pub enum Expr<'a> {
     Fetch(&'a Expr<'a>, Label<'a>),
 }
 
+fn chompws<'a>(t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>) {
+    t.skip_while(|c| c.is_ascii_whitespace());
+}
+
+fn chr(t: &mut WithContext<impl Tokens<Item = char>, &Bump>, c: char) -> Option<()> {
+    chompws(t);
+    t.token(c).then_some(())
+}
+
 fn maybe_parse_expr_binop<'a>(
     mut lhs: &'a Expr<'a>,
     t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>,
@@ -43,7 +52,7 @@ fn maybe_parse_expr_binop<'a>(
         c.is_ascii_digit() || c == '{' || c == '?' || c == '^'
     }
     loop {
-        t.skip_while(|c| c.is_ascii_whitespace());
+        chompws(t);
         match t.peek() {
             None => return Some(lhs),
             Some(x) => match x {
@@ -83,7 +92,7 @@ fn maybe_parse_expr_binop<'a>(
 pub fn parse_expr<'a>(
     t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>,
 ) -> Option<&'a Expr<'a>> {
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     let e = one_of!(t;
         parse_int(t),
         parse_top(t),
@@ -98,24 +107,20 @@ fn parse_braced_expr<'a>(
     t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>,
 ) -> Option<&'a Expr<'a>> {
     let bump = *t.context();
-    t.skip_while(|c| c.is_ascii_whitespace());
-    t.token('{').then_some(())?;
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chr(t, '{')?;
+    chompws(t);
     match t.peek()? {
         x if x.is_ascii_alphabetic() => {
             let l = parse_label(t)?;
-            t.skip_while(|c| c.is_ascii_whitespace());
-            t.token('=').then_some(())?;
+            chr(t, '=')?;
             let e = parse_expr(t)?;
-            t.skip_while(|c| c.is_ascii_whitespace());
-            t.token('}').then_some(())?;
+            chr(t, '}')?;
             Some(&*bump.alloc(Expr::Label(l, e)))
         }
         _ => {
             let e = parse_expr(t)?;
-            t.skip_while(|c| c.is_ascii_whitespace());
-            t.token('}').then_some(())?;
-            t.skip_while(|c| c.is_ascii_whitespace());
+            chr(t, '}')?;
+            chompws(t);
             let mode = one_of!(t;
                 t.token('@').then(|| AbstrMode::AbstrGeneral),
                 t.token('*').then(|| AbstrMode::AbstrLabHide),
@@ -127,7 +132,7 @@ fn parse_braced_expr<'a>(
 
 fn parse_top<'a>(t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>) -> Option<&'a Expr<'a>> {
     let bump: &Bump = *t.context();
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     t.token('^').then(|| &*bump.alloc(Expr::Top))
 }
 
@@ -135,7 +140,7 @@ fn parse_int<'a>(t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>) -> Opt
     let bump: &Bump = *t.context();
     let mut i = 0;
     let mut found_digits = false;
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     loop {
         match t.peek() {
             Some(c) if c.is_digit(10) => {
@@ -157,7 +162,7 @@ fn parse_int<'a>(t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>) -> Opt
 
 fn parse_label<'a>(t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>) -> Option<Label<'a>> {
     let bump: &Bump = *t.context();
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     let s = bumpalo::collections::String::from_iter_in(
         t.take_while(|c| c.is_ascii_alphabetic()).as_iter(),
         bump,
@@ -174,12 +179,12 @@ fn parse_query<'a>(
     t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>,
 ) -> Option<&'a Expr<'a>> {
     let bump: &Bump = *t.context();
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     t.token('?').then(|| &*bump.alloc(Expr::Query))
 }
 
 fn parse_type<'a>(t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>) -> Option<&'a Type<'a>> {
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     let ty = one_of!(t;
         parse_top_type(t),
         parse_int_type(t),
@@ -192,7 +197,7 @@ fn parse_top_type<'a>(
     t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>,
 ) -> Option<&'a Type<'a>> {
     let bump: &Bump = *t.context();
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     t.token('^').then(|| &*bump.alloc(Type::Top))
 }
 
@@ -200,7 +205,7 @@ fn parse_int_type<'a>(
     t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>,
 ) -> Option<&'a Type<'a>> {
     let bump: &Bump = *t.context();
-    t.skip_while(|c| c.is_ascii_whitespace());
+    chompws(t);
     t.tokens("Int".chars()).then(|| &*bump.alloc(Type::Int))
 }
 
@@ -210,7 +215,7 @@ fn maybe_parse_ty_binop<'a>(
 ) -> Option<&'a Type<'a>> {
     let bump: &Bump = *t.context();
     loop {
-        t.skip_while(|c| c.is_ascii_whitespace());
+        chompws(t);
         match t.peek() {
             None => return Some(lhs),
             Some(x) => match x {
@@ -234,15 +239,12 @@ fn maybe_parse_ty_binop<'a>(
 fn parse_rcd_type<'a>(
     t: &mut WithContext<impl Tokens<Item = char>, &'a Bump>,
 ) -> Option<&'a Type<'a>> {
-    t.skip_while(|c| c.is_ascii_whitespace());
     let bump: &Bump = *t.context();
-    t.token('{').then_some(())?;
+    chr(t, '{')?;
     let l = parse_label(t)?;
-    t.skip_while(|c| c.is_ascii_whitespace());
-    t.token(':').then_some(())?;
+    chr(t, ':')?;
     let ty = parse_type(t)?;
-    t.skip_while(|c| c.is_ascii_whitespace());
-    t.token('}').then_some(())?;
+    chr(t, '}')?;
     Some(&*bump.alloc(Type::Rcd(l, ty)))
 }
 
