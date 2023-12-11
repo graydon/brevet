@@ -1,6 +1,8 @@
 use arbitrary::Arbitrary;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+pub mod arena;
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize)]
 pub struct Label(Arc<String>);
@@ -30,7 +32,9 @@ impl Type {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, Arbitrary, Serialize, Deserialize,
+)]
 pub enum AbstrMode {
     AbstrLabHide,
     AbstrGeneral,
@@ -251,7 +255,10 @@ pub fn cast(val: &Expr, ty: &Type) -> Result<Expr, Error> {
             }
         }
         // CASTING-AND
-        (_, Type::And(a, b)) => Ok(Expr::Merge(Arc::new(cast(val, a)?), Arc::new(cast(val, b)?))),
+        (_, Type::And(a, b)) => Ok(Expr::Merge(
+            Arc::new(cast(val, a)?),
+            Arc::new(cast(val, b)?),
+        )),
         // CASTING-RCD
         (Expr::Label(elab, e), Type::Rcd(tlab, t)) if elab == tlab => {
             Ok(Expr::Label(elab.clone(), Arc::new(cast(e, t)?)))

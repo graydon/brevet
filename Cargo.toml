@@ -13,3 +13,5 @@ license = "MIT OR Apache-2.0"
 arbitrary = {version = "1", features = ["derive"]}
 serde = { version = "1.0", features = ["derive", "rc"] }
 
+bumpalo = { version = "3.14.0", features = ["collections"]}
+yap = "0.12.0"
